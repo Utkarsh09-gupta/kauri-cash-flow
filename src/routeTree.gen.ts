@@ -10,11 +10,29 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as MerchantRouteImport } from './routes/merchant'
+import { Route as MyqrRouteImport } from './routes/myqr'
+import { Route as PayRouteImport } from './routes/pay'
 import { Route as UserRouteImport } from './routes/user'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MerchantRoute = MerchantRouteImport.update({
+  id: '/merchant',
+  path: '/merchant',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyqrRoute = MyqrRouteImport.update({
+  id: '/myqr',
+  path: '/myqr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PayRoute = PayRouteImport.update({
+  id: '/pay',
+  path: '/pay',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UserRoute = UserRouteImport.update({
@@ -25,27 +43,39 @@ const UserRoute = UserRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/merchant': typeof MerchantRoute
+  '/myqr': typeof MyqrRoute
+  '/pay': typeof PayRoute
   '/user': typeof UserRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/merchant': typeof MerchantRoute
+  '/myqr': typeof MyqrRoute
+  '/pay': typeof PayRoute
   '/user': typeof UserRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/merchant': typeof MerchantRoute
+  '/myqr': typeof MyqrRoute
+  '/pay': typeof PayRoute
   '/user': typeof UserRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/user'
+  fullPaths: '/' | '/merchant' | '/myqr' | '/pay' | '/user'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/user'
-  id: '__root__' | '/' | '/user'
+  to: '/' | '/merchant' | '/myqr' | '/pay' | '/user'
+  id: '__root__' | '/' | '/merchant' | '/myqr' | '/pay' | '/user'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  MerchantRoute: typeof MerchantRoute
+  MyqrRoute: typeof MyqrRoute
+  PayRoute: typeof PayRoute
   UserRoute: typeof UserRoute
 }
 
@@ -56,6 +86,27 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/merchant': {
+      id: '/merchant'
+      path: '/merchant'
+      fullPath: '/merchant'
+      preLoaderRoute: typeof MerchantRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/myqr': {
+      id: '/myqr'
+      path: '/myqr'
+      fullPath: '/myqr'
+      preLoaderRoute: typeof MyqrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pay': {
+      id: '/pay'
+      path: '/pay'
+      fullPath: '/pay'
+      preLoaderRoute: typeof PayRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/user': {
@@ -70,6 +121,9 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  MerchantRoute: MerchantRoute,
+  MyqrRoute: MyqrRoute,
+  PayRoute: PayRoute,
   UserRoute: UserRoute,
 }
 export const routeTree = rootRouteImport
