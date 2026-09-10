@@ -6,7 +6,7 @@ export type TxnStatus = "pending_verification" | "verified_offline" | "pending_s
 export type Txn = {
   txnId: string;
   amount: number;
-  note?: string;
+  note?: string | undefined;
   payer: string;
   payerVpa: string;
   merchant: string;
@@ -16,8 +16,8 @@ export type Txn = {
   signature: string;
   publicKey: string;
   status: TxnStatus;
-  acceptedAt?: number;
-  syncedAt?: number;
+  acceptedAt?: number | undefined;
+  syncedAt?: number | undefined;
 };
 
 export type KauriState = {
@@ -34,7 +34,7 @@ export type Payload = {
   v: 1;
   txnId: string;
   amount: number;
-  note?: string;
+  note?: string | undefined;
   payer: string;
   payerVpa: string;
   merchant: string;
