@@ -13,6 +13,9 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as MerchantRouteImport } from './routes/merchant'
 import { Route as MyqrRouteImport } from './routes/myqr'
 import { Route as PayRouteImport } from './routes/pay'
+import { Route as ScanRouteImport } from './routes/scan'
+import { Route as SecurityRouteImport } from './routes/security'
+import { Route as TransactionsRouteImport } from './routes/transactions'
 import { Route as UserRouteImport } from './routes/user'
 
 const IndexRoute = IndexRouteImport.update({
@@ -35,6 +38,21 @@ const PayRoute = PayRouteImport.update({
   path: '/pay',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ScanRoute = ScanRouteImport.update({
+  id: '/scan',
+  path: '/scan',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SecurityRoute = SecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TransactionsRoute = TransactionsRouteImport.update({
+  id: '/transactions',
+  path: '/transactions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UserRoute = UserRouteImport.update({
   id: '/user',
   path: '/user',
@@ -46,6 +64,9 @@ export interface FileRoutesByFullPath {
   '/merchant': typeof MerchantRoute
   '/myqr': typeof MyqrRoute
   '/pay': typeof PayRoute
+  '/scan': typeof ScanRoute
+  '/security': typeof SecurityRoute
+  '/transactions': typeof TransactionsRoute
   '/user': typeof UserRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +74,9 @@ export interface FileRoutesByTo {
   '/merchant': typeof MerchantRoute
   '/myqr': typeof MyqrRoute
   '/pay': typeof PayRoute
+  '/scan': typeof ScanRoute
+  '/security': typeof SecurityRoute
+  '/transactions': typeof TransactionsRoute
   '/user': typeof UserRoute
 }
 export interface FileRoutesById {
@@ -61,14 +85,42 @@ export interface FileRoutesById {
   '/merchant': typeof MerchantRoute
   '/myqr': typeof MyqrRoute
   '/pay': typeof PayRoute
+  '/scan': typeof ScanRoute
+  '/security': typeof SecurityRoute
+  '/transactions': typeof TransactionsRoute
   '/user': typeof UserRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/merchant' | '/myqr' | '/pay' | '/user'
+  fullPaths:
+    | '/'
+    | '/merchant'
+    | '/myqr'
+    | '/pay'
+    | '/scan'
+    | '/security'
+    | '/transactions'
+    | '/user'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/merchant' | '/myqr' | '/pay' | '/user'
-  id: '__root__' | '/' | '/merchant' | '/myqr' | '/pay' | '/user'
+  to:
+    | '/'
+    | '/merchant'
+    | '/myqr'
+    | '/pay'
+    | '/scan'
+    | '/security'
+    | '/transactions'
+    | '/user'
+  id:
+    | '__root__'
+    | '/'
+    | '/merchant'
+    | '/myqr'
+    | '/pay'
+    | '/scan'
+    | '/security'
+    | '/transactions'
+    | '/user'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -76,6 +128,9 @@ export interface RootRouteChildren {
   MerchantRoute: typeof MerchantRoute
   MyqrRoute: typeof MyqrRoute
   PayRoute: typeof PayRoute
+  ScanRoute: typeof ScanRoute
+  SecurityRoute: typeof SecurityRoute
+  TransactionsRoute: typeof TransactionsRoute
   UserRoute: typeof UserRoute
 }
 
@@ -109,6 +164,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PayRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/scan': {
+      id: '/scan'
+      path: '/scan'
+      fullPath: '/scan'
+      preLoaderRoute: typeof ScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/security': {
+      id: '/security'
+      path: '/security'
+      fullPath: '/security'
+      preLoaderRoute: typeof SecurityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/transactions': {
+      id: '/transactions'
+      path: '/transactions'
+      fullPath: '/transactions'
+      preLoaderRoute: typeof TransactionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/user': {
       id: '/user'
       path: '/user'
@@ -124,6 +200,9 @@ const rootRouteChildren: RootRouteChildren = {
   MerchantRoute: MerchantRoute,
   MyqrRoute: MyqrRoute,
   PayRoute: PayRoute,
+  ScanRoute: ScanRoute,
+  SecurityRoute: SecurityRoute,
+  TransactionsRoute: TransactionsRoute,
   UserRoute: UserRoute,
 }
 export const routeTree = rootRouteImport
