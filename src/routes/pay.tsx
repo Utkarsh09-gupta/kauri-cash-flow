@@ -6,6 +6,7 @@ import { PaymentQR } from "@/components/kauri/PaymentQR";
 import { useKauri } from "@/lib/kauri/store";
 import { formatINR, txnToPayload } from "@/lib/kauri/crypto";
 import { MERCHANTS, OFFLINE_TXN_LIMIT, type Txn } from "@/lib/kauri/types";
+import { playErrorSound } from "@/lib/kauri/audio";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/pay")({
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/pay")({
 });
 
 function PayScreen() {
-  const { state, createPayment } = useKauri();
+  const { state, createPayment, remainingOfflineLimit } = useKauri();
   const [merchantId, setMerchantId] = useState(MERCHANTS[0]!.id);
   const [amount, setAmount] = useState("250");
   const [note, setNote] = useState("");
@@ -33,11 +34,22 @@ function PayScreen() {
 
   const submit = () => {
     setError(null);
-    if (!amount || Number.isNaN(value) || value <= 0) return setError("Enter a valid amount greater than ₹0.");
-    if (value > OFFLINE_TXN_LIMIT)
+    if (!amount || Number.isNaN(value) || value <= 0) {
+      playErrorSound(state.soundEnabled);
+      return setError("Enter a valid amount greater than ₹0.");
+    }
+    if (value > OFFLINE_TXN_LIMIT) {
+      playErrorSound(state.soundEnabled);
       return setError(`Offline transactions are capped at ${formatINR(OFFLINE_TXN_LIMIT)} per payment.`);
-    if (value > state.userBalance)
+    }
+    if (value > remainingOfflineLimit) {
+      playErrorSound(state.soundEnabled);
+      return setError(`Cumulative offline limit exceeded. Remaining allowance: ${formatINR(remainingOfflineLimit)}.`);
+    }
+    if (value > state.userBalance) {
+      playErrorSound(state.soundEnabled);
       return setError(`Insufficient offline balance. Available: ${formatINR(state.userBalance)}.`);
+    }
 
     setBusy(true);
     const merchant = MERCHANTS.find((m) => m.id === merchantId)!;

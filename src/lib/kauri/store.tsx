@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { canonicalize, newNonce, newTxnId, signPayload, DEVICE_PUBLIC_KEY } from "./crypto";
-import { USER, type Connection, type Device, type KauriState, type Txn, type TxnStatus } from "./types";
+import { USER, OFFLINE_TXN_LIMIT, type Connection, type Device, type KauriState, type Txn, type TxnStatus } from "./types";
+import { playSuccessSound, playSyncSound } from "./audio";
 
 const KEY = "kauri-pay-state-v1";
 
@@ -12,17 +13,24 @@ const initialState: KauriState = {
   txns: [],
   usedNonces: [],
   roleChosen: false,
+  soundEnabled: true,
+  maxOfflineCumulativeLimit: OFFLINE_TXN_LIMIT,
 };
 
 type Ctx = {
   state: KauriState;
   ready: boolean;
+  cumulativeOfflineSpent: number;
+  remainingOfflineLimit: number;
   setDevice: (d: Device) => void;
   setConnection: (c: Connection) => void;
   chooseRole: (d: Device) => void;
+  toggleSound: () => void;
   createPayment: (input: { amount: number; note?: string; merchantId: string; merchantName: string }) => Txn;
   acceptPayment: (txn: Txn) => void;
   markSynced: () => void;
+  exportStateJSON: () => void;
+  importStateJSON: (jsonString: string) => boolean;
   reset: () => void;
 };
 
@@ -53,54 +61,103 @@ export function KauriProvider({ children }: { children: ReactNode }) {
     (device: Device) => setState((s) => ({ ...s, device, roleChosen: true })),
     [],
   );
+  const toggleSound = useCallback(() => setState((s) => ({ ...s, soundEnabled: !s.soundEnabled })), []);
 
-  const createPayment: Ctx["createPayment"] = useCallback((input) => {
-    const base = {
-      txnId: newTxnId(),
-      amount: input.amount,
-      note: input.note,
-      payer: USER.name,
-      payerVpa: USER.vpa,
-      merchant: input.merchantName,
-      merchantId: input.merchantId,
-      nonce: newNonce(),
-      timestamp: Date.now(),
-    };
-    const txn: Txn = {
-      ...base,
-      signature: signPayload(canonicalize(base as never)),
-      publicKey: DEVICE_PUBLIC_KEY,
-      status: "pending_verification",
-    };
-    setState((s) => ({
-      ...s,
-      userBalance: Math.round((s.userBalance - input.amount) * 100) / 100,
-      txns: [txn, ...s.txns],
-    }));
-    return txn;
-  }, []);
+  const cumulativeOfflineSpent = useMemo(() => {
+    return state.txns
+      .filter((t) => t.status !== "synced")
+      .reduce((sum, t) => sum + t.amount, 0);
+  }, [state.txns]);
 
-  const acceptPayment: Ctx["acceptPayment"] = useCallback((txn) => {
+  const remainingOfflineLimit = useMemo(() => {
+    return Math.max(0, state.maxOfflineCumulativeLimit - cumulativeOfflineSpent);
+  }, [state.maxOfflineCumulativeLimit, cumulativeOfflineSpent]);
+
+  const createPayment: Ctx["createPayment"] = useCallback(
+    (input) => {
+      const base = {
+        txnId: newTxnId(),
+        amount: input.amount,
+        note: input.note,
+        payer: USER.name,
+        payerVpa: USER.vpa,
+        merchant: input.merchantName,
+        merchantId: input.merchantId,
+        nonce: newNonce(),
+        timestamp: Date.now(),
+      };
+      const txn: Txn = {
+        ...base,
+        signature: signPayload(canonicalize(base as never)),
+        publicKey: DEVICE_PUBLIC_KEY,
+        status: "pending_verification",
+      };
+
+      setState((s) => {
+        if (s.soundEnabled) playSuccessSound(true);
+        return {
+          ...s,
+          userBalance: Math.round((s.userBalance - input.amount) * 100) / 100,
+          txns: [txn, ...s.txns],
+        };
+      });
+      return txn;
+    },
+    [],
+  );
+
+  const acceptPayment: Ctx["acceptPayment"] = useCallback(
+    (txn) => {
+      setState((s) => {
+        if (s.soundEnabled) playSuccessSound(true);
+        const exists = s.txns.some((t) => t.txnId === txn.txnId);
+        const accepted: Txn = { ...txn, status: "pending_sync", acceptedAt: Date.now() };
+        return {
+          ...s,
+          merchantBalance: Math.round((s.merchantBalance + txn.amount) * 100) / 100,
+          usedNonces: [...s.usedNonces, txn.nonce],
+          txns: exists ? s.txns.map((t) => (t.txnId === txn.txnId ? accepted : t)) : [accepted, ...s.txns],
+        };
+      });
+    },
+    [],
+  );
+
+  const markSynced = useCallback(() => {
     setState((s) => {
-      const exists = s.txns.some((t) => t.txnId === txn.txnId);
-      const accepted: Txn = { ...txn, status: "pending_sync", acceptedAt: Date.now() };
+      if (s.soundEnabled) playSyncSound(true);
       return {
         ...s,
-        merchantBalance: Math.round((s.merchantBalance + txn.amount) * 100) / 100,
-        usedNonces: [...s.usedNonces, txn.nonce],
-        txns: exists ? s.txns.map((t) => (t.txnId === txn.txnId ? accepted : t)) : [accepted, ...s.txns],
+        connection: "online",
+        txns: s.txns.map((t) =>
+          t.status === "pending_sync" ? { ...t, status: "synced" as TxnStatus, syncedAt: Date.now() } : t,
+        ),
       };
     });
   }, []);
 
-  const markSynced = useCallback(() => {
-    setState((s) => ({
-      ...s,
-      connection: "online",
-      txns: s.txns.map((t) =>
-        t.status === "pending_sync" ? { ...t, status: "synced" as TxnStatus, syncedAt: Date.now() } : t,
-      ),
-    }));
+  const exportStateJSON = useCallback(() => {
+    const json = JSON.stringify(state, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `KauriStateBackup-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [state]);
+
+  const importStateJSON = useCallback((jsonString: string) => {
+    try {
+      const parsed = JSON.parse(jsonString) as KauriState;
+      if (parsed && Array.isArray(parsed.txns)) {
+        setState({ ...initialState, ...parsed });
+        return true;
+      }
+    } catch {
+      /* corrupt JSON */
+    }
+    return false;
   }, []);
 
   const reset = useCallback(() => {
@@ -109,8 +166,38 @@ export function KauriProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<Ctx>(
-    () => ({ state, ready, setDevice, setConnection, chooseRole, createPayment, acceptPayment, markSynced, reset }),
-    [state, ready, setDevice, setConnection, chooseRole, createPayment, acceptPayment, markSynced, reset],
+    () => ({
+      state,
+      ready,
+      cumulativeOfflineSpent,
+      remainingOfflineLimit,
+      setDevice,
+      setConnection,
+      chooseRole,
+      toggleSound,
+      createPayment,
+      acceptPayment,
+      markSynced,
+      exportStateJSON,
+      importStateJSON,
+      reset,
+    }),
+    [
+      state,
+      ready,
+      cumulativeOfflineSpent,
+      remainingOfflineLimit,
+      setDevice,
+      setConnection,
+      chooseRole,
+      toggleSound,
+      createPayment,
+      acceptPayment,
+      markSynced,
+      exportStateJSON,
+      importStateJSON,
+      reset,
+    ],
   );
 
   return <KauriContext.Provider value={value}>{children}</KauriContext.Provider>;

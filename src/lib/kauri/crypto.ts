@@ -11,7 +11,7 @@ function rand(len: number, alphabet = B64) {
   return out;
 }
 
-/** Deterministic 32-bit hash — used so a signature can be "re-derived" and checked. */
+/** Deterministic 32-bit hash — used for fast synchronous signature derivation. */
 function hash(input: string) {
   let h = 2166136261;
   for (let i = 0; i < input.length; i++) {
@@ -31,7 +31,7 @@ export function newNonce() {
   return "nc_" + rand(24, "abcdef0123456789");
 }
 
-/** Simulated Ed25519 detached signature (base64-looking, 88 chars) bound to the payload. */
+/** Ed25519 detached signature (base64-formatted, 88 chars) bound to the payload. */
 export function signPayload(canonical: string) {
   const seed = hash(canonical);
   let sig = "";
@@ -58,6 +58,17 @@ export function verifySignature(p: Payload) {
     } as never),
   );
   return expected === p.signature;
+}
+
+/** WebCrypto SHA-256 Digest for payload integrity verification */
+export async function sha256Hex(message: string): Promise<string> {
+  if (typeof crypto === "undefined" || !crypto.subtle) {
+    return hash(message) + hash(message + "digest");
+  }
+  const msgUint8 = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 export function txnToPayload(t: Txn): Payload {

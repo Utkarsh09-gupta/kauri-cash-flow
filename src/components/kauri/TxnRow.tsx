@@ -3,6 +3,7 @@ import { ArrowDownLeft, ArrowUpRight, Hash, KeyRound, Clock } from "lucide-react
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatINR } from "@/lib/kauri/crypto";
 import { STATUS_LABEL, type Txn, type TxnStatus } from "@/lib/kauri/types";
+import { ReceiptModal } from "@/components/kauri/ReceiptModal";
 import { cn } from "@/lib/utils";
 
 export function StatusPill({ status }: { status: TxnStatus }) {
@@ -21,6 +22,7 @@ export function StatusPill({ status }: { status: TxnStatus }) {
 
 export function TxnRow({ txn, perspective }: { txn: Txn; perspective: "user" | "merchant" }) {
   const [open, setOpen] = useState(false);
+  const [receiptOpen, setReceiptOpen] = useState(false);
   const incoming = perspective === "merchant";
 
   return (
@@ -88,9 +90,19 @@ export function TxnRow({ txn, perspective }: { txn: Txn; perspective: "user" | "
               <Detail icon={KeyRound} label="Ed25519 signature" value={txn.signature} />
               <Detail icon={KeyRound} label="Device public key" value={txn.publicKey} />
             </div>
+            <button
+              onClick={() => {
+                setOpen(false);
+                setReceiptOpen(true);
+              }}
+              className="w-full rounded-full bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-semibold text-white transition-colors"
+            >
+              View & Print Digital Receipt
+            </button>
           </div>
         </DialogContent>
       </Dialog>
+      <ReceiptModal txn={txn} open={receiptOpen} onOpenChange={setReceiptOpen} />
     </>
   );
 }

@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AlertTriangle, Clock, Database, Fingerprint, KeyRound, RefreshCw, ShieldCheck } from "lucide-react";
+import { useState } from "react";
+import { AlertTriangle, Clock, Database, Fingerprint, KeyRound, RefreshCw, ShieldCheck, ShieldAlert, CheckCircle2, RotateCcw } from "lucide-react";
 import { AppShell, Panel } from "@/components/kauri/AppShell";
-import { OFFLINE_TXN_LIMIT } from "@/lib/kauri/types";
-import { formatINR } from "@/lib/kauri/crypto";
+import { OFFLINE_TXN_LIMIT, type Payload } from "@/lib/kauri/types";
+import { formatINR, verifySignature, signPayload, canonicalize, newNonce, DEVICE_PUBLIC_KEY } from "@/lib/kauri/crypto";
 
 export const Route = createFileRoute("/security")({
   head: () => ({
@@ -49,7 +50,65 @@ const CARDS = [
   },
 ];
 
+function createSamplePayload(): Payload {
+  const base = {
+    txnId: "KP-DEMO-9988-77",
+    amount: 250,
+    note: "Security Sandbox Demo",
+    payer: "Rahul Verma",
+    payerVpa: "rahul@kauri",
+    merchant: "Sharma Store",
+    merchantId: "MERCH-SHARMA-001",
+    nonce: newNonce(),
+    timestamp: Date.now(),
+  };
+  return {
+    v: 1,
+    ...base,
+    signature: signPayload(canonicalize(base as never)),
+    publicKey: DEVICE_PUBLIC_KEY,
+    alg: "Ed25519",
+  };
+}
+
 function SecurityCenter() {
+  const [samplePayload, setSamplePayload] = useState<Payload>(createSamplePayload);
+  const [editedJson, setEditedJson] = useState<string>(() => JSON.stringify(createSamplePayload(), null, 2));
+
+  const resetSandbox = () => {
+    const fresh = createSamplePayload();
+    setSamplePayload(fresh);
+    setEditedJson(JSON.stringify(fresh, null, 2));
+  };
+
+  let parsed: Payload | null = null;
+  let parseError = false;
+  try {
+    parsed = JSON.parse(editedJson) as Payload;
+  } catch {
+    parseError = true;
+  }
+
+  const isSigValid = parsed ? verifySignature(parsed) : false;
+
+  const tamperAmount = () => {
+    if (!parsed) return;
+    const modified = { ...parsed, amount: 25000 };
+    setEditedJson(JSON.stringify(modified, null, 2));
+  };
+
+  const corruptSig = () => {
+    if (!parsed) return;
+    const modified = { ...parsed, signature: parsed.signature.slice(0, -6) + "BADSIG==" };
+    setEditedJson(JSON.stringify(modified, null, 2));
+  };
+
+  const tamperNonce = () => {
+    if (!parsed) return;
+    const modified = { ...parsed, nonce: "nc_tampered_replay_12345" };
+    setEditedJson(JSON.stringify(modified, null, 2));
+  };
+
   return (
     <AppShell>
       <h1 className="font-display text-2xl font-semibold">Security center</h1>
@@ -57,6 +116,109 @@ function SecurityCenter() {
         Offline payments cannot ask a server for permission, so trust has to travel inside the payload. Here is what
         Kauri Pay checks, and where the honest limits are.
       </p>
+
+      {/* Interactive Cryptographic Tampering Sandbox */}
+      <Panel className="mt-6 border-blue-500/30 bg-blue-500/5">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border/60">
+          <div>
+            <div className="flex items-center gap-2">
+              <KeyRound className="size-5 text-blue-400" />
+              <h2 className="font-display text-lg font-semibold text-foreground">Interactive Cryptographic Tamper Sandbox</h2>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Edit the transaction JSON directly or use quick-tamper buttons to observe live Ed25519 signature verification failure.
+            </p>
+          </div>
+          <button
+            onClick={resetSandbox}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/40 px-3 py-1.5 text-xs font-semibold hover:bg-secondary/70"
+          >
+            <RotateCcw className="size-3.5" /> Restore Valid Signature
+          </button>
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <div>
+            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Payload JSON (Editable)</label>
+            <textarea
+              value={editedJson}
+              onChange={(e) => setEditedJson(e.target.value)}
+              rows={10}
+              className="w-full rounded-xl border border-input bg-slate-950 p-3 font-mono text-[11px] leading-relaxed text-blue-200 outline-none focus:border-primary"
+            />
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              <button
+                onClick={tamperAmount}
+                className="rounded-full border border-warning/40 bg-warning/10 px-3 py-1 text-xs font-semibold text-warning hover:bg-warning/20"
+              >
+                Tamper Amount (₹250 → ₹25,000)
+              </button>
+              <button
+                onClick={corruptSig}
+                className="rounded-full border border-destructive/40 bg-destructive/10 px-3 py-1 text-xs font-semibold text-destructive hover:bg-destructive/20"
+              >
+                Corrupt Signature
+              </button>
+              <button
+                onClick={tamperNonce}
+                className="rounded-full border border-purple-500/40 bg-purple-500/10 px-3 py-1 text-xs font-semibold text-purple-400 hover:bg-purple-500/20"
+              >
+                Modify Nonce
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-col justify-between rounded-xl border border-border/80 bg-slate-950/60 p-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Live Verification Status</p>
+              {parseError ? (
+                <div className="flex items-start gap-2.5 rounded-xl border border-destructive/40 bg-destructive/15 p-3 text-xs text-destructive">
+                  <ShieldAlert className="size-5 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block text-sm">JSON Syntax Error</span>
+                    <span>The raw payload string is not valid JSON.</span>
+                  </div>
+                </div>
+              ) : isSigValid ? (
+                <div className="flex items-start gap-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/15 p-3 text-xs text-emerald-400">
+                  <CheckCircle2 className="size-5 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block text-sm">Ed25519 Signature Verified!</span>
+                    <span>The payload data exactly matches the digital signature produced by public key <code className="font-mono text-[10px] text-emerald-300">{parsed?.publicKey}</code>.</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2.5 rounded-xl border border-destructive/40 bg-destructive/15 p-3 text-xs text-destructive">
+                  <ShieldAlert className="size-5 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block text-sm">Signature Verification Failed!</span>
+                    <span>The signature does not match the payload attributes. Tampering detected! Merchants will reject this transaction offline.</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-4 space-y-2 text-xs">
+                <div className="flex justify-between py-1 border-b border-slate-800">
+                  <span className="text-muted-foreground">Canonicalized Data</span>
+                  <span className="font-mono text-[11px] text-slate-300 max-w-[200px] truncate">
+                    {parsed ? [parsed.txnId, parsed.amount, parsed.payerVpa, parsed.merchantId, parsed.nonce, parsed.timestamp].join("|") : "N/A"}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-800">
+                  <span className="text-muted-foreground">Attached Signature</span>
+                  <span className="font-mono text-[11px] text-slate-300 max-w-[200px] truncate">
+                    {parsed?.signature ?? "N/A"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-muted-foreground italic mt-4 pt-3 border-t border-slate-800">
+              * Try editing the amount or nonce in the text area on the left to see how cryptographic hashes immediately detect unauthorized payload modifications without internet connectivity.
+            </p>
+          </div>
+        </div>
+      </Panel>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {CARDS.map((c) => (

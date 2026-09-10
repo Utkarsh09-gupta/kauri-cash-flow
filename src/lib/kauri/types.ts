@@ -28,6 +28,8 @@ export type KauriState = {
   txns: Txn[];
   usedNonces: string[];
   roleChosen: boolean;
+  soundEnabled: boolean;
+  maxOfflineCumulativeLimit: number;
 };
 
 export type Payload = {

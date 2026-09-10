@@ -27,7 +27,7 @@ const ACTIONS = [
 ] as const;
 
 function UserDashboard() {
-  const { state } = useKauri();
+  const { state, cumulativeOfflineSpent, remainingOfflineLimit } = useKauri();
   const mine = state.txns.filter((t) => t.payerVpa === USER.vpa).slice(0, 5);
 
   return (
@@ -44,10 +44,26 @@ function UserDashboard() {
         <Panel className="lg:col-span-2" >
           <p className="text-sm text-muted-foreground">Available offline balance</p>
           <p className="font-display mt-1 text-4xl font-semibold tracking-tight">{formatINR(state.userBalance)}</p>
-          <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-            <WifiOff className="size-3.5" /> Signed on-device · per-transaction offline cap {formatINR(OFFLINE_TXN_LIMIT)}
-          </p>
-          <div className="mt-6 flex flex-wrap gap-2">
+          <div className="mt-4 pt-3 border-t border-border/60">
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-muted-foreground font-medium">Offline Cumulative Allowance</span>
+              <span className="font-semibold text-foreground">
+                {formatINR(cumulativeOfflineSpent)} / {formatINR(state.maxOfflineCumulativeLimit)}
+              </span>
+            </div>
+            <div className="w-full bg-secondary/80 h-2 rounded-full overflow-hidden">
+              <div
+                className="bg-primary h-full transition-all duration-300 rounded-full"
+                style={{
+                  width: `${Math.min(100, (cumulativeOfflineSpent / state.maxOfflineCumulativeLimit) * 100)}%`,
+                }}
+              />
+            </div>
+            <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <WifiOff className="size-3 text-warning" /> Signed on-device · {formatINR(remainingOfflineLimit)} remaining before central sync
+            </p>
+          </div>
+          <div className="mt-5 flex flex-wrap gap-2">
             <Link
               to="/pay"
               className="rounded-full px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)]"

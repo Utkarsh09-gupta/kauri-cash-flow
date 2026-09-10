@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { Check, Loader2, RefreshCw } from "lucide-react";
+import { useRef, useState } from "react";
+import { Check, Download, Loader2, RefreshCw, Upload } from "lucide-react";
+import { toast } from "sonner";
 import { AppShell, ConnectionBadge, Panel } from "@/components/kauri/AppShell";
 import { TxnRow } from "@/components/kauri/TxnRow";
 import { useKauri } from "@/lib/kauri/store";
@@ -35,10 +36,26 @@ const STEPS = [
 ];
 
 function Ledger() {
-  const { state, markSynced, setConnection } = useKauri();
+  const { state, markSynced, setConnection, exportStateJSON, importStateJSON } = useKauri();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
   const [step, setStep] = useState(-1);
   const [running, setRunning] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (content && importStateJSON(content)) {
+        toast.success("Ledger and state imported successfully!");
+      } else {
+        toast.error("Invalid JSON ledger backup file.");
+      }
+    };
+    reader.readAsText(file);
+  };
 
   const pending = state.txns.filter((t) => t.status === "pending_sync");
   const list =
@@ -77,15 +94,38 @@ function Ledger() {
                 : "Nothing pending — the local ledger matches the central ledger."}
             </p>
           </div>
-          <button
-            onClick={sync}
-            disabled={running || pending.length === 0}
-            className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-40"
-            style={{ background: "var(--gradient-accent)" }}
-          >
-            {running ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-            Sync transactions
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              accept=".json"
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              title="Import Ledger Backup (JSON)"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/40 px-3.5 py-2 text-xs font-semibold hover:bg-secondary/70"
+            >
+              <Upload className="size-3.5" /> Import
+            </button>
+            <button
+              onClick={exportStateJSON}
+              title="Export Ledger Backup (JSON)"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/40 px-3.5 py-2 text-xs font-semibold hover:bg-secondary/70"
+            >
+              <Download className="size-3.5" /> Export
+            </button>
+            <button
+              onClick={sync}
+              disabled={running || pending.length === 0}
+              className="inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40"
+              style={{ background: "var(--gradient-accent)" }}
+            >
+              {running ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+              Sync transactions
+            </button>
+          </div>
         </div>
 
         {step >= 0 && (

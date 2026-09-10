@@ -6,6 +6,8 @@ import { AppShell, ConnectionBadge, Panel } from "@/components/kauri/AppShell";
 import { useKauri } from "@/lib/kauri/store";
 import { formatINR, parsePayload, txnToPayload, verifySignature } from "@/lib/kauri/crypto";
 import { OFFLINE_TXN_LIMIT, TIMESTAMP_WINDOW_MS, type Payload, type Txn } from "@/lib/kauri/types";
+import { playScanSound, playErrorSound } from "@/lib/kauri/audio";
+import { ReceiptModal } from "@/components/kauri/ReceiptModal";
 
 export const Route = createFileRoute("/scan")({
   head: () => ({
@@ -55,6 +57,8 @@ function ScanScreen() {
   const [error, setError] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [accepted, setAccepted] = useState(false);
+  const [receiptTxn, setReceiptTxn] = useState<Txn | null>(null);
+  const [receiptOpen, setReceiptOpen] = useState(false);
 
   const verify = (input: string) => {
     setError(null);
@@ -64,14 +68,20 @@ function ScanScreen() {
       setPayload(null);
       setChecks(null);
       setError(parsed.error);
+      playErrorSound(state.soundEnabled);
       return;
     }
+    playScanSound(state.soundEnabled);
     setVerifying(true);
     setPayload(parsed.payload);
     setChecks(null);
     setTimeout(() => {
-      setChecks(runChecks(parsed.payload, state.usedNonces));
+      const computedChecks = runChecks(parsed.payload, state.usedNonces);
+      setChecks(computedChecks);
       setVerifying(false);
+      if (!computedChecks.every((c) => c.ok)) {
+        playErrorSound(state.soundEnabled);
+      }
     }, 800);
   };
 
@@ -98,6 +108,7 @@ function ScanScreen() {
     };
     acceptPayment(txn);
     setAccepted(true);
+    setReceiptTxn(txn);
     toast.success(`${formatINR(txn.amount)} accepted offline — logged as Pending sync.`);
   };
 
@@ -206,7 +217,13 @@ function ScanScreen() {
                     Logged to the local ledger as Pending sync. Merchant balance is now{" "}
                     {formatINR(state.merchantBalance)}.
                   </p>
-                  <div className="mt-3 flex gap-2">
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setReceiptOpen(true)}
+                      className="rounded-full bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs font-semibold text-white"
+                    >
+                      View Digital Receipt
+                    </button>
                     <Link to="/transactions" className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">
                       Open ledger
                     </Link>
@@ -228,6 +245,7 @@ function ScanScreen() {
           )}
         </Panel>
       </div>
+      <ReceiptModal txn={receiptTxn} open={receiptOpen} onOpenChange={setReceiptOpen} />
     </AppShell>
   );
 }

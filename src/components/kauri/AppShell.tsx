@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Wifi, WifiOff, RefreshCw, Smartphone, Store, RotateCcw, X } from "lucide-react";
+import { Wifi, WifiOff, RefreshCw, Smartphone, Store, RotateCcw, X, Volume2, VolumeX, Download } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useKauri } from "@/lib/kauri/store";
 import { formatINR } from "@/lib/kauri/crypto";
@@ -134,7 +134,7 @@ function RestoredBanner() {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { state, reset } = useKauri();
+  const { state, reset, toggleSound, exportStateJSON } = useKauri();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const balance = state.device === "user" ? state.userBalance : state.merchantBalance;
 
@@ -156,6 +156,23 @@ export function AppShell({ children }: { children: ReactNode }) {
             <DeviceSwitcher />
             <ConnectionToggle />
             <ConnectionBadge />
+            <button
+              onClick={toggleSound}
+              title={state.soundEnabled ? "Mute audio synthesizer" : "Enable audio synthesizer"}
+              className={cn(
+                "grid size-8 place-items-center rounded-full border border-border transition-colors",
+                state.soundEnabled ? "text-blue-400 border-blue-500/40 bg-blue-500/10" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {state.soundEnabled ? <Volume2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
+            </button>
+            <button
+              onClick={exportStateJSON}
+              title="Backup current ledger & state (JSON)"
+              className="grid size-8 place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <Download className="size-3.5" />
+            </button>
             <button
               onClick={reset}
               title="Reset demo data"
